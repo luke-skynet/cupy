@@ -1046,56 +1046,26 @@ cpdef _ndarray_base matmul(
         ap = _mat_ptrs(a)
         bp = _mat_ptrs(b)
         cp = _mat_ptrs(c_view)
-        if (cuda_dtype == runtime.CUDA_R_16F
-                or cuda_dtype == runtime.CUDA_R_16BF):
-            cublas.gemmBatchedEx(
-                handle,
-                0,  # transa
-                0,  # transb
-                n, m, ka, one.ctypes.data,
-                ap.data.ptr, cuda_dtype, lda,
-                bp.data.ptr, cuda_dtype, ldb,
-                zero.ctypes.data,
-                cp.data.ptr, cuda_dtype, ldc,
-                batchCount, compute_dtype, algo)
-        elif cuda_dtype == runtime.CUDA_R_32F:
-            cublas.sgemmBatched(
-                handle,
-                0,  # transa
-                0,  # transb
-                n, m, ka, one.ctypes.data,
-                ap.data.ptr, lda,
-                bp.data.ptr, ldb,
-                zero.ctypes.data, cp.data.ptr, ldc, batchCount)
-        elif cuda_dtype == runtime.CUDA_R_64F:
-            cublas.dgemmBatched(
-                handle,
-                0,  # transa
-                0,  # transb
-                n, m, ka, one.ctypes.data,
-                ap.data.ptr, lda,
-                bp.data.ptr, ldb,
-                zero.ctypes.data, cp.data.ptr, ldc, batchCount)
-        elif cuda_dtype == runtime.CUDA_C_32F:
-            cublas.cgemmBatched(
-                handle,
-                0,  # transa
-                0,  # transb
-                n, m, ka, one.ctypes.data,
-                ap.data.ptr, lda,
-                bp.data.ptr, ldb,
-                zero.ctypes.data, cp.data.ptr, ldc, batchCount)
-        elif cuda_dtype == runtime.CUDA_C_64F:
-            cublas.zgemmBatched(
-                handle,
-                0,  # transa
-                0,  # transb
-                n, m, ka, one.ctypes.data,
-                ap.data.ptr, lda,
-                bp.data.ptr, ldb,
-                zero.ctypes.data, cp.data.ptr, ldc, batchCount)
-        else:
+
+        if not (use_16bit_gemm or dtype.char in 'fFdD'):
             raise TypeError(dtype, a.dtype, b.dtype)
+
+        # gemmBatchedEx requires cublasComputeType_t.
+        if cuda_dtype in (runtime.CUDA_R_64F, runtime.CUDA_C_64F):
+            compute_dtype = cublas.CUBLAS_COMPUTE_64F
+        else:
+            compute_dtype = cublas.CUBLAS_COMPUTE_32F
+
+        cublas.gemmBatchedEx(
+            handle,
+            0,  # transa
+            0,  # transb
+            n, m, ka, one.ctypes.data,
+            ap.data.ptr, cuda_dtype, lda,
+            bp.data.ptr, cuda_dtype, ldb,
+            zero.ctypes.data,
+            cp.data.ptr, cuda_dtype, ldc,
+            batchCount, compute_dtype, algo)
 
     if out is not c:
         elementwise_copy(c, out)

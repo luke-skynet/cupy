@@ -485,3 +485,18 @@ class TestMatmul16Bit(unittest.TestCase):
             rtol=1e-2,  # bfloat16 error range
             atol=1e-3,
         )
+
+
+@pytest.mark.parametrize('dtype', [
+    numpy.float32, numpy.float64, numpy.complex64, numpy.complex128,
+])
+@testing.numpy_cupy_allclose(rtol=1e-5, atol=1e-5)
+def test_broadcast_gemm_batched_ex(xp, dtype):
+    a = testing.shaped_arange((2, 1, 2, 3), xp, dtype) / 8
+    b = testing.shaped_arange((1, 3, 3, 4), xp, dtype) / 16
+    if numpy.dtype(dtype).kind == 'c':
+        a = a + 1j * (a + 1)
+        b = b - 1j * (b + 2)
+    if xp is cupy:
+        return _linalg.matmul(a, b)
+    return numpy.matmul(a, b)

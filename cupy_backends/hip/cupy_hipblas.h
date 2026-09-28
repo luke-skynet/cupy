@@ -565,8 +565,39 @@ cublasStatus_t cublasGemmEx(cublasHandle_t handle, cublasOperation_t transa, cub
 cublasStatus_t cublasGemmEx_v11(...) {
     return HIPBLAS_STATUS_NOT_SUPPORTED;
 }
-cublasStatus_t cublasGemmBatchedEx(...) {
-    return HIPBLAS_STATUS_NOT_SUPPORTED;
+cublasStatus_t cublasGemmBatchedEx(
+        cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb,
+        int m, int n, int k, const void* alpha,
+        const void* const* A, cudaDataType_t Atype, int lda,
+        const void* const* B, cudaDataType_t Btype, int ldb,
+        const void* beta, void* const* C, cudaDataType_t Ctype, int ldc,
+        int batchCount, cublasComputeType_t computeType, cublasGemmAlgo_t algo) {
+    if (algo != -1) {  // CUBLAS_GEMM_DEFAULT
+        return HIPBLAS_STATUS_NOT_SUPPORTED;
+    }
+
+    // The existing converter takes cudaDataType_t. Before ROCm 7, hipBLAS
+    // also requires a complex compute datatype for complex matrices.
+    cudaDataType_t compute_dtype;
+    switch (static_cast<int>(computeType)) {
+        case 68:  // CUBLAS_COMPUTE_32F
+            compute_dtype = (Ctype == 4) ? 4 : 0;  // CUDA_C_32F / CUDA_R_32F
+            break;
+        case 70:  // CUBLAS_COMPUTE_64F
+            compute_dtype = (Ctype == 5) ? 5 : 1;  // CUDA_C_64F / CUDA_R_64F
+            break;
+        default:
+            return HIPBLAS_STATUS_NOT_SUPPORTED;
+    }
+
+    return hipblasGemmBatchedEx(
+        handle, convert_hipblasOperation_t(transa), convert_hipblasOperation_t(transb),
+        m, n, k, alpha,
+        const_cast<const void**>(A), convert_hipblasDatatype_t(Atype), lda,
+        const_cast<const void**>(B), convert_hipblasDatatype_t(Btype), ldb,
+        beta, const_cast<void**>(C), convert_hipblasDatatype_t(Ctype), ldc,
+        batchCount, convert_hipblasComputeType_t(compute_dtype),
+        HIPBLAS_GEMM_DEFAULT);
 }
 cublasStatus_t cublasGemmStridedBatchedEx_v11(...) {
     return HIPBLAS_STATUS_NOT_SUPPORTED;
